@@ -1,19 +1,34 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
 export default function Home() {
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        setEmail(user.email || "");
+      }
+    };
+
+    checkUser();
+  }, []);
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-black text-white px-6">
-      <h1 className="text-6xl font-bold tracking-tight">
-        Glimpse
-      </h1>
-
-      <p className="mt-6 text-xl text-gray-300 text-center max-w-xl">
-        Capture moments. Preserve memories.
-        <br />
-        Your life, one glimpse at a time.
-      </p>
-
-      <button className="mt-8 rounded-full bg-white text-black px-8 py-3 font-semibold hover:bg-gray-200 transition">
-        Start Sharing
-      </button>
+    <main className="min-h-screen flex items-center justify-center">
+      {email ? (
+        <h1>Logged in as: {email}</h1>
+      ) : (
+        <h1>Not Logged In</h1>
+      )}
     </main>
   );
 }
