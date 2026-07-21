@@ -3,48 +3,63 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { uploadGlimpse } from "@/lib/supabase/storage";
+import { useToast } from "@/components/ToastProvider";
 
 export default function UploadGlimpse() {
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
+  const toast = useToast();
 
   async function upload() {
-    if (!file) return;
-    setUploading(true); 
+    if (!file) {
+      toast.showToast("Select a photo to upload your memory.", "info");
+      return;
+    }
 
-    const supabase = createClient();
+    setUploading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const supabase = createClient();
 
-    if (!user) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const imageUrl = await uploadGlimpse(file, user.id);
+      if (!user) {
+        toast.showToast("Please sign in to upload a memory.", "error");
+        return;
+      }
 
-    const { data, error } = await supabase
-      .from("glimpses")
-      .insert({
-        user_id: user.id,
-        image_url: imageUrl,
-        caption,
-      });
+      const imageUrl = await uploadGlimpse(file, user.id);
 
-  if (error) {
-  setUploading(false);
+      const { error } = await supabase
+        .from("glimpses")
+        .insert({
+          user_id: user.id,
+          image_url: imageUrl,
+          caption,
+        });
 
-  console.error("INSERT ERROR:", error);
-  alert(`Database error: ${error.message}`);
-  return;
-}
+      if (error) {
+        console.error("INSERT ERROR:", error);
+        toast.showToast(`Database error: ${error.message}`, "error");
+        return;
+      }
 
-    console.log("INSERT DATA:", data);
-
-    setUploading(false);
-
-alert("Glimpse uploaded 🎉");
-window.location.reload();
+      toast.showToast("Glimpse uploaded 🎉", "success");
+      window.location.reload();
+    } catch (error) {
+      console.error("UPLOAD ERROR:", error);
+      toast.showToast(
+        error instanceof Error
+          ? `Upload failed: ${error.message}`
+          : "Upload failed. Please try again.",
+        "error"
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -75,10 +90,10 @@ window.location.reload();
         />
 
         <button
-          
-  onClick={upload}
-  disabled={uploading}
-          className="w-full rounded-2xl bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-400 text-white font-semibold py-4 shadow-lg hover:scale-[1.02] transition-all"
+          type="button"
+          onClick={upload}
+          disabled={uploading}
+          className="w-full rounded-2xl bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-400 text-white font-semibold py-4 shadow-lg hover:scale-[1.02] transition-all disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? "Uploading..." : "Upload Glimpse ✨"}
         </button>

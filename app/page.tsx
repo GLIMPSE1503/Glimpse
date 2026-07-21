@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import LoginButton from "@/components/LoginButton";
 import UploadGlimpse from "@/components/UploadGlimpse";
@@ -17,7 +18,7 @@ export default async function Home() {
         <div className="w-full max-w-5xl mx-auto">
 
           <div className="bg-white/70 backdrop-blur-md rounded-3xl shadow-lg p-6 mb-8 border border-white/50">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
 
               <div>
                 <h1 className="text-5xl font-bold bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-400 bg-clip-text text-transparent">
@@ -29,29 +30,30 @@ export default async function Home() {
                 </p>
               </div>
 
-     <div className="flex items-center gap-3">
-<img
-  src={user.user_metadata.avatar_url}
-  alt="profile"
-  className="w-10 h-10 rounded-full border-2 border-white shadow"
-/>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt="profile"
+                      className="w-12 h-12 rounded-full border-2 border-white shadow"
+                    />
 
-<div className="flex flex-col">
-  <span className="font-semibold text-gray-800">
-    {user.user_metadata.full_name}
-  </span>
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-gray-800">
+                        {user.user_metadata.full_name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {user.email}
+                      </span>
+                    </div>
 
-  <span className="text-xs text-gray-500">
-    {user.email}
-  </span>
-</div>
+                    <Link href="/profile" className="rounded-full bg-violet-100 px-4 py-2 text-violet-700 transition hover:bg-violet-200">
+                      View profile
+                    </Link>
 
-  <LogoutButton />
-
-</div>
-
-            </div>
-          </div>
+                    <LogoutButton />
+                  </div>
+                </div>
+              </div>
 
           <UploadGlimpse />
 
