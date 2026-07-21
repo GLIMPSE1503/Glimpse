@@ -17,10 +17,10 @@ export type CommentRow = {
   id: string;
   glimpse_id: string;
   user_id: string;
-  user_full_name: string | null;
-  user_avatar_url: string | null;
-  text: string;
+  content: string;
   created_at: string;
+  user_full_name?: string | null;
+  user_avatar_url?: string | null;
 };
 
 export type SupabaseUser = {

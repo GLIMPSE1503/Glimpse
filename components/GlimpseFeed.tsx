@@ -33,7 +33,7 @@ export default function GlimpseFeed() {
         supabase.auth.getUser(),
         supabase.from("glimpses").select("id, user_id, image_url, caption, created_at").order("created_at", { ascending: false }),
         supabase.from("likes").select("id, glimpse_id, user_id"),
-        supabase.from("comments").select("id, glimpse_id, user_id, user_full_name, user_avatar_url, text, created_at").order("created_at", { ascending: true }),
+        supabase.from("comments").select("id, glimpse_id, user_id, user_full_name, user_avatar_url, content, created_at").order("created_at", { ascending: true }),
       ]);
 
       if (glimpsesError) {
@@ -178,7 +178,7 @@ export default function GlimpseFeed() {
       user_id: userId,
       user_full_name: currentUserName,
       user_avatar_url: currentUserAvatar,
-      text,
+      content: text,
       created_at: new Date().toISOString(),
     };
 
@@ -196,9 +196,9 @@ export default function GlimpseFeed() {
         user_id: userId,
         user_full_name: currentUserName,
         user_avatar_url: currentUserAvatar,
-        text,
+        content: text,
       })
-      .select("id, glimpse_id, user_id, user_full_name, user_avatar_url, text, created_at")
+      .select("id, glimpse_id, user_id, user_full_name, user_avatar_url, content, created_at")
       .single();
 
     if (error) {

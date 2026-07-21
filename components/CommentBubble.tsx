@@ -46,7 +46,7 @@ export default function CommentBubble({ comment, isOwn, onDelete }: CommentBubbl
         ) : null}
       </div>
 
-      <p className="mt-4 rounded-3xl bg-purple-50 p-4 text-sm leading-6 text-slate-700">{comment.text}</p>
+      <p className="mt-4 rounded-3xl bg-purple-50 p-4 text-sm leading-6 text-slate-700">{comment.content}</p>
     </div>
   );
 }
