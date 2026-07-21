@@ -1,18 +1,22 @@
-import { createClient } from "@/lib/supabase/client";
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
 
-  const code = requestUrl.searchParams.get("code");
+  const code = searchParams.get("code");
+
+  console.log("CODE:", code ? "Received" : "Missing");
 
   if (code) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } =
+      await supabase.auth.exchangeCodeForSession(code);
+
+    console.log("USER:", data.user?.email);
+    console.log("ERROR:", error);
   }
 
-  return NextResponse.redirect(
-    new URL("/", request.url)
-  );
+  return NextResponse.redirect(`${origin}/`);
 }

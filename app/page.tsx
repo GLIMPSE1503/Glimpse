@@ -1,33 +1,21 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import LoginButton from "@/components/LoginButton";
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+export default async function Home() {
+  const supabase = await createClient();
 
-export default function Home() {
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const supabase = createClient();
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        setEmail(user.email || "");
-      }
-    };
-
-    checkUser();
-  }, []);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <main className="min-h-screen flex items-center justify-center">
-      {email ? (
-        <h1>Logged in as: {email}</h1>
+      {user ? (
+        <h1>
+          Logged in as: {user.email}
+        </h1>
       ) : (
-        <h1>Not Logged In</h1>
+        <LoginButton />
       )}
     </main>
   );
