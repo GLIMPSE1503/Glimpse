@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CommentRow } from "@/lib/supabase/types";
 
 interface CommentBubbleProps {
@@ -24,7 +25,10 @@ export default function CommentBubble({ comment, isOwn, onDelete }: CommentBubbl
   return (
     <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-sm shadow-slate-200/50">
       <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-slate-50 px-4 py-3">
-        <div className="flex items-center gap-3">
+        <Link
+          href={`/profile/${comment.user_id}`}
+          className="flex items-center gap-3 rounded-2xl transition hover:bg-slate-100/80"
+        >
           <img
             src={comment.user_avatar_url || "/placeholder-avatar.png"}
             alt={comment.user_full_name ?? "User avatar"}
@@ -34,7 +38,7 @@ export default function CommentBubble({ comment, isOwn, onDelete }: CommentBubbl
             <p className="font-semibold text-slate-900">{comment.user_full_name || "Anonymous"}</p>
             <p className="text-xs text-slate-500">{timeAgo(comment.created_at)}</p>
           </div>
-        </div>
+        </Link>
         {isOwn && onDelete ? (
           <button
             type="button"
