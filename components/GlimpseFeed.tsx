@@ -62,6 +62,7 @@ export default function GlimpseFeed() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Favorites (local-only, no DB yet)
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
