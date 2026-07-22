@@ -13,13 +13,13 @@ export default function LikeButton({ count, liked, disabled, onToggle }: LikeBut
       type="button"
       onClick={onToggle}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold transition ${
+      className={`inline-flex items-center gap-3 rounded-full border px-5 py-3 text-sm font-semibold transition ${
         liked
-          ? "bg-pink-500 text-white hover:bg-pink-600"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-      } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
+          ? "border-transparent bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white shadow-xl shadow-fuchsia-500/20"
+          : "border-slate-200 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50"
+      } ${disabled ? "cursor-not-allowed opacity-70" : "hover:-translate-y-0.5"}`}
     >
-      <span>❤️</span>
+      <span className="text-base">❤️</span>
       <span>{count} Likes</span>
     </button>
   );

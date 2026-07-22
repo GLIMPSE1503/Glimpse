@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { CommentRow } from "@/lib/supabase/types";
 import CommentBubble from "@/components/CommentBubble";
 
@@ -25,23 +26,34 @@ export default function CommentSection({
   return (
     <div className="mt-5 rounded-3xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-md">
       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-        <span className="font-semibold">💬 {comments.length} Comments</span>
+        <span className="font-semibold">💬 Comments</span>
       </div>
 
       <div className="mt-4 space-y-4">
         {comments.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-            No comments yet. Leave the first memory note.
+           💭 No comments yet. Start the conversation.
           </div>
         ) : (
-          comments.map((comment) => (
-            <CommentBubble
-              key={comment.id}
-              comment={comment}
-              isOwn={currentUserId === comment.user_id}
-              onDelete={onDelete}
-            />
-          ))
+          <div className="space-y-4">
+            <AnimatePresence initial={false}>
+              {comments.map((comment) => (
+                <motion.div
+                  key={comment.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                >
+                  <CommentBubble
+                    comment={comment}
+                    isOwn={currentUserId === comment.user_id}
+                    onDelete={onDelete}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         )}
       </div>
 

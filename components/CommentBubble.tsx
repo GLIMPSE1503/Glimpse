@@ -22,13 +22,13 @@ function timeAgo(dateString: string) {
 
 export default function CommentBubble({ comment, isOwn, onDelete }: CommentBubbleProps) {
   return (
-    <div className="rounded-[28px] border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-3">
+    <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-sm shadow-slate-200/50">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-slate-50 px-4 py-3">
         <div className="flex items-center gap-3">
           <img
             src={comment.user_avatar_url || "/placeholder-avatar.png"}
             alt={comment.user_full_name ?? "User avatar"}
-            className="h-10 w-10 rounded-full object-cover"
+            className="h-11 w-11 rounded-full object-cover"
           />
           <div>
             <p className="font-semibold text-slate-900">{comment.user_full_name || "Anonymous"}</p>
@@ -39,14 +39,16 @@ export default function CommentBubble({ comment, isOwn, onDelete }: CommentBubbl
           <button
             type="button"
             onClick={() => onDelete(comment.id)}
-            className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
+            className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
           >
             Delete
           </button>
         ) : null}
       </div>
 
-      <p className="mt-4 rounded-3xl bg-purple-50 p-4 text-sm leading-6 text-slate-700">{comment.content}</p>
+      <div className="rounded-b-[28px] bg-violet-50/80 p-5 text-sm leading-7 text-slate-800">
+        {comment.content}
+      </div>
     </div>
   );
 }
