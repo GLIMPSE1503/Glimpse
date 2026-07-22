@@ -64,7 +64,7 @@ export default function GlimpseFeed() {
   const [searchTerm, setSearchTerm] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  // Favorites (local-only, no DB yet)
+  // Favorites (now backed by Supabase `favorites` table)
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
@@ -73,13 +73,15 @@ export default function GlimpseFeed() {
       setLoading(true);
       const supabase = createClient();
 
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData?.user?.id ?? null;
+
       const [
-        { data: userData },
         { data: glimpsesData, error: glimpsesError },
         { data: likesData, error: likesError },
         { data: commentsData, error: commentsError },
+        { data: favoritesData, error: favoritesError },
       ] = await Promise.all([
-        supabase.auth.getUser(),
         supabase
           .from("glimpses")
           .select("id, user_id, image_url, caption, created_at")
@@ -89,6 +91,9 @@ export default function GlimpseFeed() {
           .from("comments")
           .select("id, glimpse_id, user_id, user_full_name, user_avatar_url, content, created_at")
           .order("created_at", { ascending: true }),
+        userId
+          ? supabase.from("favorites").select("id, glimpse_id, user_id").eq("user_id", userId)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (glimpsesError) {
@@ -104,7 +109,11 @@ export default function GlimpseFeed() {
         console.error(commentsError);
       }
 
-      setCurrentUserId(userData?.user?.id ?? null);
+      if (favoritesError) {
+        console.error(favoritesError);
+      }
+
+      setCurrentUserId(userId);
       setCurrentUserName(userData?.user?.user_metadata?.full_name ?? null);
       setCurrentUserAvatar(userData?.user?.user_metadata?.avatar_url ?? null);
 
@@ -121,7 +130,7 @@ export default function GlimpseFeed() {
           aggregatedLikes[like.glimpse_id] = { count: 0, liked: false };
         }
         aggregatedLikes[like.glimpse_id].count += 1;
-        if (like.user_id === userData?.user?.id) {
+        if (like.user_id === userId) {
           aggregatedLikes[like.glimpse_id].liked = true;
         }
       });
@@ -134,6 +143,17 @@ export default function GlimpseFeed() {
       }, {});
 
       setComments(groupedComments);
+
+      // Convert favorites rows into { [glimpseId]: true }
+      const aggregatedFavorites = (favoritesData ?? []).reduce(
+        (acc: Record<string, boolean>, favorite: { glimpse_id: string }) => {
+          acc[favorite.glimpse_id] = true;
+          return acc;
+        },
+        {}
+      );
+
+      setFavorites(aggregatedFavorites);
       setLoading(false);
     }
 
@@ -384,35 +404,91 @@ export default function GlimpseFeed() {
   }
 
   async function updateCaption(glimpseId: string) {
-    if (!editCaption.trim()) return;
+  if (!editCaption.trim()) return;
 
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("glimpses")
+    .update({
+      caption: editCaption,
+    })
+    .eq("id", glimpseId)
+    .select();
+
+  console.log("UPDATE RESULT:", data);
+  console.log("UPDATE ERROR:", error);
+
+  if (error) {
+    toast.showToast(error.message, "error");
+    return;
+  }
+
+  setGlimpses((current) =>
+    current.map((g) =>
+      g.id === glimpseId
+        ? { ...g, caption: editCaption }
+        : g
+    )
+  );
+
+  setEditingId(null);
+  setEditCaption("");
+
+  toast.showToast("Caption updated ✨", "success");
+}
+
+  async function toggleFavorite(glimpseId: string) {
     const supabase = createClient();
+    const userId = currentUserId;
 
-    const { error } = await supabase
-      .from("glimpses")
-      .update({ caption: editCaption })
-      .eq("id", glimpseId);
-
-    if (error) {
-      toast.showToast("Could not update caption.", "error");
+    if (!userId) {
+      toast.showToast("Sign in to favorite memories.", "info");
       return;
     }
 
-    setGlimpses((current) =>
-      current.map((g) => (g.id === glimpseId ? { ...g, caption: editCaption } : g))
-    );
+    const wasFavorited = !!favorites[glimpseId];
+    const nextFavorited = !wasFavorited;
 
-    setEditingId(null);
-    setEditCaption("");
-
-    toast.showToast("Caption updated ✨", "success");
-  }
-
-  function toggleFavorite(glimpseId: string) {
+    // Optimistic UI update
     setFavorites((current) => ({
       ...current,
-      [glimpseId]: !current[glimpseId],
+      [glimpseId]: nextFavorited,
     }));
+
+    if (nextFavorited) {
+      const { error } = await supabase
+        .from("favorites")
+        .insert({ glimpse_id: glimpseId, user_id: userId })
+        .select("id")
+        .single();
+
+      if (error) {
+        console.error("Favorite insert error:", error);
+        // Rollback
+        setFavorites((current) => ({
+          ...current,
+          [glimpseId]: wasFavorited,
+        }));
+        toast.showToast("Could not save your favorite.", "error");
+      }
+    } else {
+      const { error } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("glimpse_id", glimpseId)
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Favorite delete error:", error);
+        // Rollback
+        setFavorites((current) => ({
+          ...current,
+          [glimpseId]: wasFavorited,
+        }));
+        toast.showToast("Could not remove your favorite.", "error");
+      }
+    }
   }
 
   const searchedGlimpses = glimpses.filter((g) =>
