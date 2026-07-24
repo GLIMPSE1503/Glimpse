@@ -11,10 +11,10 @@ import EditProfileModal from "@/components/profile/EditProfileModal";
 import { ProfileRow, GlimpseRow } from "@/lib/supabase/types";
 
 type Stats = {
-  memoriesCount: number;
+  postsCount: number;
+  followersCount: number;
+  followingCount: number;
   likesReceived: number;
-  commentsReceived: number;
-  favoritesCount: number;
 };
 
 export default function ProfilePage() {
@@ -26,11 +26,12 @@ export default function ProfilePage() {
   const [email, setEmail] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [glimpses, setGlimpses] = useState<GlimpseRow[]>([]);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [stats, setStats] = useState<Stats>({
-    memoriesCount: 0,
+    postsCount: 0,
+    followersCount: 0,
+    followingCount: 0,
     likesReceived: 0,
-    commentsReceived: 0,
-    favoritesCount: 0,
   });
   const [loading, setLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -48,7 +49,9 @@ export default function ProfilePage() {
     const [
       { data: profileData, error: profileError },
       { data: glimpsesData, error: glimpsesError },
-      { data: favoritesData },
+      followersRes,
+      followingRes,
+      viewerFollowRes,
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -60,7 +63,16 @@ export default function ProfilePage() {
         .select("id, user_id, image_url, caption, created_at")
         .eq("user_id", profileUserId)
         .order("created_at", { ascending: false }),
-      supabase.from("favorites").select("id, glimpse_id").eq("user_id", profileUserId),
+      supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", profileUserId),
+      supabase.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", profileUserId),
+      viewerId
+        ? supabase
+            .from("follows")
+            .select("follower_id")
+            .eq("follower_id", viewerId)
+            .eq("following_id", profileUserId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     if (profileError) console.error(profileError);
@@ -71,28 +83,27 @@ export default function ProfilePage() {
 
     setProfile(profileData ?? null);
     setEmail(viewerId === profileUserId ? userData?.user?.email ?? null : null);
+    setIsFollowing(!!viewerFollowRes.data);
 
     const loadedGlimpses = glimpsesData ?? [];
     setGlimpses(loadedGlimpses);
 
     const glimpseIds = loadedGlimpses.map((g) => g.id);
     let likesReceived = 0;
-    let commentsReceived = 0;
 
     if (glimpseIds.length > 0) {
-      const [likesRes, commentsRes] = await Promise.all([
-        supabase.from("likes").select("id", { count: "exact", head: true }).in("glimpse_id", glimpseIds),
-        supabase.from("comments").select("id", { count: "exact", head: true }).in("glimpse_id", glimpseIds),
-      ]);
+      const likesRes = await supabase
+        .from("likes")
+        .select("id", { count: "exact", head: true })
+        .in("glimpse_id", glimpseIds);
       likesReceived = likesRes.count ?? 0;
-      commentsReceived = commentsRes.count ?? 0;
     }
 
     setStats({
-      memoriesCount: loadedGlimpses.length,
+      postsCount: loadedGlimpses.length,
+      followersCount: followersRes.count ?? 0,
+      followingCount: followingRes.count ?? 0,
       likesReceived,
-      commentsReceived,
-      favoritesCount: (favoritesData ?? []).length,
     });
 
     setLoading(false);
@@ -105,10 +116,18 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileUserId]);
 
+  function handleFollowChange(nextIsFollowing: boolean) {
+    setIsFollowing(nextIsFollowing);
+    setStats((current) => ({
+      ...current,
+      followersCount: Math.max(0, current.followersCount + (nextIsFollowing ? 1 : -1)),
+    }));
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="h-40 w-full animate-pulse rounded-[32px] bg-slate-200" />
+        <div className="h-52 w-full animate-pulse rounded-[32px] bg-slate-200" />
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-3xl bg-slate-200" />
@@ -120,7 +139,16 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <ProfileHeader profile={profile} email={email} isOwnProfile={isOwnProfile} onEdit={() => setIsEditOpen(true)} />
+      <ProfileHeader
+        profile={profile}
+        email={email}
+        isOwnProfile={isOwnProfile}
+        currentUserId={currentUserId}
+        profileUserId={profileUserId}
+        isFollowing={isFollowing}
+        onFollowChange={handleFollowChange}
+        onEdit={() => setIsEditOpen(true)}
+      />
 
       <ProfileStats stats={stats} />
 

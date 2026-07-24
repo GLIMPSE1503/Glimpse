@@ -30,6 +30,25 @@ export type ProfileRow = {
   created_at: string;
   updated_at: string;
 };
+export type FollowRow = {
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+};
+
+export type NotificationRow = {
+  id: string;
+  user_id: string;
+  actor_id: string;
+  type: "like" | "comment" | "follow";
+  glimpse_id: string | null;
+  comment_id: string | null;
+  is_read: boolean;
+  created_at: string;
+  // joined fields, populated client-side
+  actor_name?: string | null;
+  actor_avatar?: string | null;
+};
 
 export type SupabaseUser = {
   id: string;
