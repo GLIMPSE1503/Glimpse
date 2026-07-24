@@ -1,20 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
+import AnimatedNumber from "@/components/shared/AnimatedNumber";
 
 type Stats = {
-  memoriesCount: number;
+  postsCount: number;
+  followersCount: number;
+  followingCount: number;
   likesReceived: number;
-  commentsReceived: number;
-  favoritesCount: number;
 };
 
 export default function ProfileStats({ stats }: { stats: Stats }) {
   const items = [
-    { label: "Memories", value: stats.memoriesCount, icon: "🖼️" },
+    { label: "Posts", value: stats.postsCount, icon: "🖼️" },
+    { label: "Followers", value: stats.followersCount, icon: "👥" },
+    { label: "Following", value: stats.followingCount, icon: "➡️" },
     { label: "Likes Received", value: stats.likesReceived, icon: "❤️" },
-    { label: "Comments Received", value: stats.commentsReceived, icon: "💬" },
-    { label: "Favorites", value: stats.favoritesCount, icon: "★" },
   ];
 
   return (
@@ -31,7 +32,9 @@ export default function ProfileStats({ stats }: { stats: Stats }) {
           <span className="text-xl" aria-hidden="true">
             {item.icon}
           </span>
-          <span className="text-xl font-semibold text-slate-900">{item.value}</span>
+          <span className="text-xl font-semibold text-slate-900">
+            <AnimatedNumber value={item.value} />
+          </span>
           <span className="text-xs text-slate-500">{item.label}</span>
         </motion.div>
       ))}

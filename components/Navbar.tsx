@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import { motion } from "framer-motion";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import { motion, AnimatePresence } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { ProfileRow } from "@/lib/supabase/types";
 
 interface NavbarProps {
   user: User | null;
@@ -15,6 +17,10 @@ interface NavbarProps {
 export default function Navbar({ user, onUploadOpen }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<ProfileRow[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,6 +32,41 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!term) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, bio, avatar_url, created_at, updated_at")
+        .ilike("full_name", `%${term}%`)
+        .limit(8);
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+      setSearchResults(data ?? []);
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
 
   async function signIn() {
     const supabase = createClient();
@@ -54,24 +95,64 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
           <span className="text-lg font-semibold text-violet-700">
             ✨ Glimpse
           </span>
-          <span className="text-sm text-slate-500">
+          <span className="hidden text-sm text-slate-500 sm:inline">
             Moments, refined
           </span>
         </div>
 
-        {/* Center Buttons */}
-        <div className="hidden items-center gap-3 md:flex">
-          <button
-            className="inline-flex h-11 w-11 items-center justify-center rounded-3xl border border-slate-200 bg-white hover:bg-violet-50"
-          >
-            🔍
-          </button>
+        {/* Center: Search */}
+        <div className="hidden flex-1 items-center justify-center gap-3 md:flex">
+          <div ref={searchRef} className="relative w-full max-w-xs">
+            <input
+              type="text"
+              value={searchTerm}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setSearchOpen(true);
+              }}
+              placeholder="Search people..."
+              className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+            />
 
-          <button
-            className="inline-flex h-11 w-11 items-center justify-center rounded-3xl border border-slate-200 bg-white hover:bg-violet-50"
-          >
-            🔔
-          </button>
+            <AnimatePresence>
+              {searchOpen && searchTerm.trim() && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-2 shadow-xl"
+                >
+                  {searchResults.length === 0 ? (
+                    <p className="p-3 text-center text-sm text-slate-400">No people found.</p>
+                  ) : (
+                    searchResults.map((person) => (
+                      <Link
+                        key={person.id}
+                        href={`/profile/${person.id}`}
+                        onClick={() => {
+                          setSearchOpen(false);
+                          setSearchTerm("");
+                        }}
+                        className="flex items-center gap-3 rounded-2xl p-2.5 transition hover:bg-violet-50"
+                      >
+                        <img
+                          src={person.avatar_url || "/placeholder-avatar.png"}
+                          alt={person.full_name ?? "User"}
+                          className="h-9 w-9 rounded-full object-cover"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{person.full_name || "Glimpse User"}</p>
+                          {person.bio && <p className="line-clamp-1 text-xs text-slate-500">{person.bio}</p>}
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Right Side */}
@@ -83,6 +164,8 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
           >
             Upload memory
           </button>
+
+          <NotificationBell currentUserId={user?.id ?? null} />
 
           {user ? (
             <div className="relative">
@@ -139,6 +222,14 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
                       className="block rounded-xl px-4 py-3 hover:bg-violet-50"
                     >
                       Profile
+                    </Link>
+
+                    <Link
+                      href="/settings"
+                      onClick={() => setDropdownOpen(false)}
+                      className="block rounded-xl px-4 py-3 hover:bg-violet-50"
+                    >
+                      Settings
                     </Link>
 
                     <button
