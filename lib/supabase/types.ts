@@ -79,7 +79,35 @@ export type GlimpseStatsRow = {
   like_count: number;
   comment_count: number;
 };
+export type StoryRow = {
+  id: string;
+  user_id: string;
+  image_url: string;
+  created_at: string;
+  author_name?: string | null;
+  author_avatar?: string | null;
+};
 
+export type StoryGroup = {
+  userId: string;
+  authorName: string;
+  authorAvatar: string | null;
+  stories: StoryRow[];
+};
+
+export type CollectionRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type CollectionItemRow = {
+  id: string;
+  collection_id: string;
+  glimpse_id: string;
+  created_at: string;
+};
 export type SupabaseUser = {
   id: string;
   email: string | null;

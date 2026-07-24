@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
 import LikeButton from "@/components/LikeButton";
 import CommentSection from "@/components/CommentSection";
-import ShareMenu from "@/components/shared/ShareMenu";
 import { CommentRow, GlimpseRow } from "@/lib/supabase/types";
+import { useInfiniteScroll } from "@/components/shared/useInfiniteScroll";
 
 function formatRelativeTime(createdAt: string) {
   const date = new Date(createdAt);
@@ -42,6 +42,7 @@ type LikeState = { count: number; liked: boolean };
 type FeedTab = "for-you" | "following" | "favorites";
 
 const skeletonCount = 4;
+const PAGE_SIZE = 8;
 
 export default function GlimpseFeed() {
   const toast = useToast();
@@ -64,6 +65,11 @@ export default function GlimpseFeed() {
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [burstId, setBurstId] = useState<string | null>(null);
 
+  // Infinite scroll pagination
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   useEffect(() => {
     async function loadFeed() {
       setLoading(true);
@@ -82,7 +88,8 @@ export default function GlimpseFeed() {
         supabase
           .from("glimpses")
           .select("id, user_id, image_url, caption, created_at")
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .range(0, PAGE_SIZE - 1),
         supabase.from("likes").select("id, glimpse_id, user_id"),
         supabase
           .from("comments")
@@ -111,6 +118,8 @@ export default function GlimpseFeed() {
 
       const loadedGlimpses = glimpsesData ?? [];
       setGlimpses(loadedGlimpses);
+      setHasMore(loadedGlimpses.length === PAGE_SIZE);
+      setPage(0);
 
       const aggregatedLikes = loadedGlimpses.reduce((acc, glimpse) => {
         acc[glimpse.id] = { count: 0, liked: false };
@@ -411,6 +420,44 @@ export default function GlimpseFeed() {
     }, 700);
   }
 
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+
+    const supabase = createClient();
+    const nextPage = page + 1;
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("glimpses")
+      .select("id, user_id, image_url, caption, created_at")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error(error);
+      toast.showToast("Could not load more memories.", "error");
+      setLoadingMore(false);
+      return;
+    }
+
+    const newGlimpses = data ?? [];
+    setGlimpses((current) => [...current, ...newGlimpses]);
+    setLikeState((state) => {
+      const next = { ...state };
+      newGlimpses.forEach((g) => {
+        if (!next[g.id]) next[g.id] = { count: 0, liked: false };
+      });
+      return next;
+    });
+    setPage(nextPage);
+    setHasMore(newGlimpses.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }
+
+  const sentinelRef = useInfiniteScroll({ hasMore, loading: loadingMore, onLoadMore: loadMore });
+
   const searchedGlimpses = glimpses.filter((g) =>
     (g.caption || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -499,128 +546,126 @@ export default function GlimpseFeed() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2">
-          {filteredGlimpses.map((glimpse) => {
-            const index = glimpses.findIndex((g) => g.id === glimpse.id);
-            const glanceLikes = likeState[glimpse.id] ?? { count: 0, liked: false };
-            const glimpseComments = comments[glimpse.id] ?? [];
-            const isOwner = currentUserId === glimpse.user_id;
-            const isEditing = editingId === glimpse.id;
-            const isFavorited = !!favorites[glimpse.id];
-            const shareUrl =
-              typeof window !== "undefined" ? `${window.location.origin}/profile/${glimpse.user_id}` : "";
+        <>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {filteredGlimpses.map((glimpse) => {
+              const index = glimpses.findIndex((g) => g.id === glimpse.id);
+              const glanceLikes = likeState[glimpse.id] ?? { count: 0, liked: false };
+              const glimpseComments = comments[glimpse.id] ?? [];
+              const isOwner = currentUserId === glimpse.user_id;
+              const isEditing = editingId === glimpse.id;
+              const isFavorited = !!favorites[glimpse.id];
 
-            return (
-              <motion.article
-                key={glimpse.id}
-                layout
-                whileHover={{ y: -6 }}
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="flex flex-col overflow-hidden rounded-[28px] border border-white/90 bg-white/90 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition duration-300"
-              >
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIndex(index)}
-                    onDoubleClick={() => handleDoubleClickLike(glimpse.id)}
-                    className="group relative block aspect-[4/3] w-full overflow-hidden bg-slate-100"
-                  >
-                    <motion.img
-                      src={glimpse.image_url}
-                      alt={glimpse.caption ?? "Memory image"}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <div className="pointer-events-none absolute inset-0 flex items-end justify-end p-4">
-                      <span className="hidden rounded-full border border-white/25 bg-slate-950/50 p-3 text-white shadow-lg transition duration-300 group-hover:inline-flex">
-                        ⤢
-                      </span>
-                    </div>
-
-                    <AnimatePresence>
-                      {burstId === glimpse.id && (
-                        <motion.span
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1.3, opacity: 1 }}
-                          exit={{ scale: 1.6, opacity: 0 }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl drop-shadow-lg"
-                        >
-                          ❤️
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleFavorite(glimpse.id)}
-                    aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
-                    className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-md transition ${
-                      isFavorited
-                        ? "border-amber-300 bg-amber-400/90 text-white"
-                        : "border-white/60 bg-white/70 text-slate-500 hover:bg-white"
-                    }`}
-                  >
-                    {isFavorited ? "★" : "☆"}
-                  </button>
-                </div>
-
-                <div className="flex flex-1 flex-col gap-4 p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    {isEditing ? (
-                      <div className="flex w-full flex-col gap-2">
-                        <input
-                          value={editCaption}
-                          onChange={(e) => setEditCaption(e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
-                          placeholder="Update your caption..."
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateCaption(glimpse.id)}
-                            className="rounded-full bg-purple-500 px-4 py-1.5 text-xs font-medium text-white shadow-sm shadow-purple-200 hover:bg-purple-600"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelEditing}
-                            className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+              return (
+                <motion.article
+                  key={glimpse.id}
+                  layout
+                  whileHover={{ y: -6 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="flex flex-col overflow-hidden rounded-[28px] border border-white/90 bg-white/90 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition duration-300"
+                >
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIndex(index)}
+                      onDoubleClick={() => handleDoubleClickLike(glimpse.id)}
+                      className="group relative block aspect-[4/3] w-full overflow-hidden bg-slate-100"
+                    >
+                      <motion.img
+                        src={glimpse.image_url}
+                        alt={glimpse.caption ?? "Memory image"}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="pointer-events-none absolute inset-0 flex items-end justify-end p-4">
+                        <span className="hidden rounded-full border border-white/25 bg-slate-950/50 p-3 text-white shadow-lg transition duration-300 group-hover:inline-flex">
+                          ⤢
+                        </span>
                       </div>
-                    ) : (
-                      <p className="text-base font-semibold leading-6 text-slate-900">
-                        {glimpse.caption || "Untitled Memory ✨"}
-                      </p>
-                    )}
 
-                    {isOwner && !isEditing && (
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEditing(glimpse)}
-                          className="rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-600 hover:bg-purple-100"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteMemory(glimpse.id)}
-                          className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-100"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
+                      <AnimatePresence>
+                        {burstId === glimpse.id && (
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1.3, opacity: 1 }}
+                            exit={{ scale: 1.6, opacity: 0 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl drop-shadow-lg"
+                          >
+                            ❤️
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite(glimpse.id)}
+                      aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                      className={`absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-md transition ${
+                        isFavorited
+                          ? "border-amber-300 bg-amber-400/90 text-white"
+                          : "border-white/60 bg-white/70 text-slate-500 hover:bg-white"
+                      }`}
+                    >
+                      {isFavorited ? "★" : "☆"}
+                    </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-1 flex-col gap-4 p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      {isEditing ? (
+                        <div className="flex w-full flex-col gap-2">
+                          <input
+                            value={editCaption}
+                            onChange={(e) => setEditCaption(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                            placeholder="Update your caption..."
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateCaption(glimpse.id)}
+                              className="rounded-full bg-purple-500 px-4 py-1.5 text-xs font-medium text-white shadow-sm shadow-purple-200 hover:bg-purple-600"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-base font-semibold leading-6 text-slate-900">
+                          {glimpse.caption || "Untitled Memory ✨"}
+                        </p>
+                      )}
+
+                      {isOwner && !isEditing && (
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditing(glimpse)}
+                            className="rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-600 hover:bg-purple-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMemory(glimpse.id)}
+                            className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-100"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex items-center gap-5 text-sm text-slate-500">
                       <LikeButton
                         count={glanceLikes.count}
@@ -638,23 +683,31 @@ export default function GlimpseFeed() {
                       </span>
                     </div>
 
-                    <ShareMenu shareUrl={shareUrl} imageUrl={glimpse.image_url} title={glimpse.caption ?? undefined} />
+                    <CommentSection
+                      comments={glimpseComments}
+                      draft={commentDrafts[glimpse.id] ?? ""}
+                      disabled={false}
+                      currentUserId={currentUserId ?? undefined}
+                      onDraftChange={(value) => setCommentDrafts((drafts) => ({ ...drafts, [glimpse.id]: value }))}
+                      onSubmit={() => postComment(glimpse.id)}
+                      onDelete={(commentId) => deleteComment(glimpse.id, commentId)}
+                    />
                   </div>
+                </motion.article>
+              );
+            })}
+          </div>
 
-                  <CommentSection
-                    comments={glimpseComments}
-                    draft={commentDrafts[glimpse.id] ?? ""}
-                    disabled={false}
-                    currentUserId={currentUserId ?? undefined}
-                    onDraftChange={(value) => setCommentDrafts((drafts) => ({ ...drafts, [glimpse.id]: value }))}
-                    onSubmit={() => postComment(glimpse.id)}
-                    onDelete={(commentId) => deleteComment(glimpse.id, commentId)}
-                  />
-                </div>
-              </motion.article>
-            );
-          })}
-        </div>
+          <div ref={sentinelRef} className="h-10 w-full" />
+
+          {loadingMore && (
+            <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] w-full animate-pulse rounded-[28px] bg-slate-200" />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <AnimatePresence>
@@ -739,28 +792,15 @@ export default function GlimpseFeed() {
                     <p className="mt-1 text-xs text-white/60">{formatFullDateTime(selectedGlimpse.created_at)}</p>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2">
-                    <ShareMenu
-                      shareUrl={
-                        typeof window !== "undefined"
-                          ? `${window.location.origin}/profile/${selectedGlimpse.user_id}`
-                          : ""
-                      }
-                      imageUrl={selectedGlimpse.image_url}
-                      title={selectedGlimpse.caption ?? undefined}
-                      variant="dark"
-                    />
-
-                    {currentUserId === selectedGlimpse.user_id && (
-                      <button
-                        type="button"
-                        onClick={() => startEditing(selectedGlimpse)}
-                        className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
+                  {currentUserId === selectedGlimpse.user_id && (
+                    <button
+                      type="button"
+                      onClick={() => startEditing(selectedGlimpse)}
+                      className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
