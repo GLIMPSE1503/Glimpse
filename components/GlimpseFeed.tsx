@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
 import LikeButton from "@/components/LikeButton";
 import CommentSection from "@/components/CommentSection";
+import ShareMenu from "@/components/shared/ShareMenu";
 import { CommentRow, GlimpseRow } from "@/lib/supabase/types";
 
 function formatRelativeTime(createdAt: string) {
@@ -23,10 +24,7 @@ function formatRelativeTime(createdAt: string) {
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days}d ago`;
 
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "short",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "short" }).format(date);
 }
 
 function formatFullDateTime(createdAt: string) {
@@ -40,10 +38,8 @@ function formatFullDateTime(createdAt: string) {
   }).format(date);
 }
 
-type LikeState = {
-  count: number;
-  liked: boolean;
-};
+type LikeState = { count: number; liked: boolean };
+type FeedTab = "for-you" | "following" | "favorites";
 
 const skeletonCount = 4;
 
@@ -63,15 +59,9 @@ export default function GlimpseFeed() {
   const [editCaption, setEditCaption] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Favorites (backed by Supabase `favorites` table)
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-
-  // Feed tabs: All Memories vs Following
-  const [feedTab, setFeedTab] = useState<"all" | "following">("all");
+  const [feedTab, setFeedTab] = useState<FeedTab>("for-you");
   const [followingIds, setFollowingIds] = useState<string[]>([]);
-
-  // Double-click-to-like heart burst
   const [burstId, setBurstId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,7 +77,7 @@ export default function GlimpseFeed() {
         { data: likesData, error: likesError },
         { data: commentsData, error: commentsError },
         { data: favoritesData, error: favoritesError },
-        { data: followsData, error: followsError },
+        { data: followersData, error: followersError },
       ] = await Promise.all([
         supabase
           .from("glimpses")
@@ -102,7 +92,7 @@ export default function GlimpseFeed() {
           ? supabase.from("favorites").select("id, glimpse_id, user_id").eq("user_id", userId)
           : Promise.resolve({ data: [] as { id: string; glimpse_id: string; user_id: string }[], error: null }),
         userId
-          ? supabase.from("follows").select("following_id").eq("follower_id", userId)
+          ? supabase.from("followers").select("following_id").eq("follower_id", userId)
           : Promise.resolve({ data: [] as { following_id: string }[], error: null }),
       ]);
 
@@ -110,22 +100,10 @@ export default function GlimpseFeed() {
         console.error(glimpsesError);
         toast.showToast("Unable to load memories.", "error");
       }
-
-      if (likesError) {
-        console.error(likesError);
-      }
-
-      if (commentsError) {
-        console.error(commentsError);
-      }
-
-      if (favoritesError) {
-        console.error(favoritesError);
-      }
-
-      if (followsError) {
-        console.error(followsError);
-      }
+      if (likesError) console.error(likesError);
+      if (commentsError) console.error(commentsError);
+      if (favoritesError) console.error(favoritesError);
+      if (followersError) console.error(followersError);
 
       setCurrentUserId(userId);
       setCurrentUserName(userData?.user?.user_metadata?.full_name ?? null);
@@ -140,25 +118,18 @@ export default function GlimpseFeed() {
       }, {} as Record<string, LikeState>);
 
       (likesData ?? []).forEach((like: { id: string; glimpse_id: string; user_id: string }) => {
-        if (!aggregatedLikes[like.glimpse_id]) {
-          aggregatedLikes[like.glimpse_id] = { count: 0, liked: false };
-        }
+        if (!aggregatedLikes[like.glimpse_id]) aggregatedLikes[like.glimpse_id] = { count: 0, liked: false };
         aggregatedLikes[like.glimpse_id].count += 1;
-        if (like.user_id === userId) {
-          aggregatedLikes[like.glimpse_id].liked = true;
-        }
+        if (like.user_id === userId) aggregatedLikes[like.glimpse_id].liked = true;
       });
-
       setLikeState(aggregatedLikes);
 
       const groupedComments = (commentsData ?? []).reduce((acc: Record<string, CommentRow[]>, comment: CommentRow) => {
         acc[comment.glimpse_id] = [...(acc[comment.glimpse_id] ?? []), comment];
         return acc;
       }, {});
-
       setComments(groupedComments);
 
-      // Convert favorites rows into { [glimpseId]: true }
       const aggregatedFavorites = (favoritesData ?? []).reduce(
         (acc: Record<string, boolean>, favorite: { glimpse_id: string }) => {
           acc[favorite.glimpse_id] = true;
@@ -166,11 +137,9 @@ export default function GlimpseFeed() {
         },
         {}
       );
-
       setFavorites(aggregatedFavorites);
 
-      // Following list (for the "Following" feed tab)
-      setFollowingIds((followsData ?? []).map((f: { following_id: string }) => f.following_id));
+      setFollowingIds((followersData ?? []).map((f: { following_id: string }) => f.following_id));
 
       setLoading(false);
     }
@@ -179,27 +148,15 @@ export default function GlimpseFeed() {
   }, [toast]);
 
   useEffect(() => {
-    if (selectedIndex === null) {
-      return;
-    }
+    if (selectedIndex === null) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSelectedIndex(null);
-      }
-
+      if (event.key === "Escape") setSelectedIndex(null);
       if (event.key === "ArrowRight") {
-        setSelectedIndex((current) => {
-          if (current === null) return null;
-          return current < glimpses.length - 1 ? current + 1 : current;
-        });
+        setSelectedIndex((current) => (current !== null && current < glimpses.length - 1 ? current + 1 : current));
       }
-
       if (event.key === "ArrowLeft") {
-        setSelectedIndex((current) => {
-          if (current === null) return null;
-          return current > 0 ? current - 1 : current;
-        });
+        setSelectedIndex((current) => (current !== null && current > 0 ? current - 1 : current));
       }
     };
 
@@ -216,14 +173,9 @@ export default function GlimpseFeed() {
     const deltaX = event.changedTouches[0]?.clientX - touchStartX.current;
     touchStartX.current = null;
 
-    if (deltaX > 60) {
-      setSelectedIndex((current) => (current && current > 0 ? current - 1 : current));
-    }
-
+    if (deltaX > 60) setSelectedIndex((current) => (current && current > 0 ? current - 1 : current));
     if (deltaX < -60) {
-      setSelectedIndex((current) =>
-        current !== null && current < glimpses.length - 1 ? current + 1 : current
-      );
+      setSelectedIndex((current) => (current !== null && current < glimpses.length - 1 ? current + 1 : current));
     }
   }
 
@@ -240,13 +192,7 @@ export default function GlimpseFeed() {
     const nextLiked = !current.liked;
     const nextCount = current.count + (nextLiked ? 1 : -1);
 
-    setLikeState((state) => ({
-      ...state,
-      [glimpseId]: {
-        count: Math.max(0, nextCount),
-        liked: nextLiked,
-      },
-    }));
+    setLikeState((state) => ({ ...state, [glimpseId]: { count: Math.max(0, nextCount), liked: nextLiked } }));
 
     if (nextLiked) {
       const { error } = await supabase
@@ -259,10 +205,7 @@ export default function GlimpseFeed() {
         console.error("Like error:", error);
         setLikeState((state) => ({
           ...state,
-          [glimpseId]: {
-            count: Math.max(0, state[glimpseId]?.count - 1),
-            liked: false,
-          },
+          [glimpseId]: { count: Math.max(0, state[glimpseId]?.count - 1), liked: false },
         }));
         toast.showToast("Could not save your like.", "error");
       }
@@ -277,10 +220,7 @@ export default function GlimpseFeed() {
         console.error("Unlike error:", error);
         setLikeState((state) => ({
           ...state,
-          [glimpseId]: {
-            count: (state[glimpseId]?.count ?? 0) + 1,
-            liked: true,
-          },
+          [glimpseId]: { count: (state[glimpseId]?.count ?? 0) + 1, liked: true },
         }));
         toast.showToast("Could not remove your like.", "error");
       }
@@ -295,7 +235,6 @@ export default function GlimpseFeed() {
       toast.showToast("Sign in to comment.", "info");
       return;
     }
-
     if (!text) {
       toast.showToast("Write something before posting.", "info");
       return;
@@ -311,10 +250,7 @@ export default function GlimpseFeed() {
       created_at: new Date().toISOString(),
     };
 
-    setComments((state) => ({
-      ...state,
-      [glimpseId]: [...(state[glimpseId] || []), newComment],
-    }));
+    setComments((state) => ({ ...state, [glimpseId]: [...(state[glimpseId] || []), newComment] }));
     setCommentDrafts((drafts) => ({ ...drafts, [glimpseId]: "" }));
 
     const supabase = createClient();
@@ -364,18 +300,11 @@ export default function GlimpseFeed() {
     }));
 
     const supabase = createClient();
-    const { error } = await supabase
-      .from("comments")
-      .delete()
-      .eq("id", commentId)
-      .eq("user_id", userId);
+    const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("user_id", userId);
 
     if (error) {
       console.error("Comment delete error:", error);
-      setComments((state) => ({
-        ...state,
-        [glimpseId]: [...(state[glimpseId] || []), existingComment],
-      }));
+      setComments((state) => ({ ...state, [glimpseId]: [...(state[glimpseId] || []), existingComment] }));
       toast.showToast("Could not delete the comment.", "error");
     }
   }
@@ -387,12 +316,7 @@ export default function GlimpseFeed() {
     if (!confirmed) return;
 
     const supabase = createClient();
-
-    const { error } = await supabase
-      .from("glimpses")
-      .delete()
-      .eq("id", glimpseId)
-      .eq("user_id", currentUserId);
+    const { error } = await supabase.from("glimpses").delete().eq("id", glimpseId).eq("user_id", currentUserId);
 
     if (error) {
       toast.showToast("Could not delete memory.", "error");
@@ -401,7 +325,6 @@ export default function GlimpseFeed() {
 
     setGlimpses((current) => current.filter((g) => g.id !== glimpseId));
 
-    // Close viewer if the deleted memory was open
     setSelectedIndex((current) => {
       if (current === null) return null;
       const wasSelectedDeleted = glimpses[current]?.id === glimpseId;
@@ -425,24 +348,16 @@ export default function GlimpseFeed() {
     if (!editCaption.trim()) return;
 
     const supabase = createClient();
-
-    const { error } = await supabase
-      .from("glimpses")
-      .update({ caption: editCaption })
-      .eq("id", glimpseId);
+    const { error } = await supabase.from("glimpses").update({ caption: editCaption }).eq("id", glimpseId);
 
     if (error) {
       toast.showToast("Could not update caption.", "error");
       return;
     }
 
-    setGlimpses((current) =>
-      current.map((g) => (g.id === glimpseId ? { ...g, caption: editCaption } : g))
-    );
-
+    setGlimpses((current) => current.map((g) => (g.id === glimpseId ? { ...g, caption: editCaption } : g)));
     setEditingId(null);
     setEditCaption("");
-
     toast.showToast("Caption updated ✨", "success");
   }
 
@@ -458,11 +373,7 @@ export default function GlimpseFeed() {
     const wasFavorited = !!favorites[glimpseId];
     const nextFavorited = !wasFavorited;
 
-    // Optimistic UI update
-    setFavorites((current) => ({
-      ...current,
-      [glimpseId]: nextFavorited,
-    }));
+    setFavorites((current) => ({ ...current, [glimpseId]: nextFavorited }));
 
     if (nextFavorited) {
       const { error } = await supabase
@@ -473,10 +384,7 @@ export default function GlimpseFeed() {
 
       if (error) {
         console.error("Favorite insert error:", error);
-        setFavorites((current) => ({
-          ...current,
-          [glimpseId]: wasFavorited,
-        }));
+        setFavorites((current) => ({ ...current, [glimpseId]: wasFavorited }));
         toast.showToast("Could not save your favorite.", "error");
       }
     } else {
@@ -488,10 +396,7 @@ export default function GlimpseFeed() {
 
       if (error) {
         console.error("Favorite delete error:", error);
-        setFavorites((current) => ({
-          ...current,
-          [glimpseId]: wasFavorited,
-        }));
+        setFavorites((current) => ({ ...current, [glimpseId]: wasFavorited }));
         toast.showToast("Could not remove your favorite.", "error");
       }
     }
@@ -499,50 +404,30 @@ export default function GlimpseFeed() {
 
   function handleDoubleClickLike(glimpseId: string) {
     const alreadyLiked = likeState[glimpseId]?.liked;
-    if (!alreadyLiked) {
-      toggleLike(glimpseId);
-    }
+    if (!alreadyLiked) toggleLike(glimpseId);
     setBurstId(glimpseId);
     window.setTimeout(() => {
       setBurstId((current) => (current === glimpseId ? null : current));
     }, 700);
   }
 
-  async function shareMemory(glimpse: GlimpseRow) {
-    const url = `${window.location.origin}/profile/${glimpse.user_id}`;
-
-    if (typeof navigator !== "undefined" && "share" in navigator) {
-      try {
-        await navigator.share({
-          title: glimpse.caption || "A memory on Glimpse",
-          url,
-        });
-      } catch {
-        // user cancelled the share sheet — no-op
-      }
-      return;
-    }
-
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(url);
-      toast.showToast("Link copied to clipboard.", "success");
-    }
-  }
-
   const searchedGlimpses = glimpses.filter((g) =>
     (g.caption || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const tabFilteredGlimpses =
-    feedTab === "following"
-      ? searchedGlimpses.filter((g) => followingIds.includes(g.user_id))
-      : searchedGlimpses;
-
-  const filteredGlimpses = showFavoritesOnly
-    ? tabFilteredGlimpses.filter((g) => favorites[g.id])
-    : tabFilteredGlimpses;
+  const filteredGlimpses = (() => {
+    if (feedTab === "following") return searchedGlimpses.filter((g) => followingIds.includes(g.user_id));
+    if (feedTab === "favorites") return searchedGlimpses.filter((g) => favorites[g.id]);
+    return searchedGlimpses;
+  })();
 
   const selectedGlimpse = selectedIndex === null ? null : glimpses[selectedIndex] ?? null;
+
+  const tabs: { key: FeedTab; label: string }[] = [
+    { key: "for-you", label: "For You" },
+    { key: "following", label: "Following" },
+    { key: "favorites", label: "Favorites" },
+  ];
 
   if (loading) {
     return (
@@ -569,30 +454,24 @@ export default function GlimpseFeed() {
 
   return (
     <>
-      {/* Feed tabs: All Memories / Following */}
       <div className="mb-5 inline-flex rounded-full bg-slate-100 p-1">
-        {(["all", "following"] as const).map((tab) => (
+        {tabs.map((tab) => (
           <button
-            key={tab}
+            key={tab.key}
             type="button"
-            onClick={() => setFeedTab(tab)}
+            onClick={() => setFeedTab(tab.key)}
             className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-              feedTab === tab
-                ? "bg-white text-purple-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+              feedTab === tab.key ? "bg-white text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            {tab === "all" ? "All Memories" : "Following"}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Search + Favorites controls */}
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-8">
         <div className="relative w-full sm:max-w-sm">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-            🔍
-          </span>
+          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
           <input
             type="text"
             value={searchTerm}
@@ -601,28 +480,12 @@ export default function GlimpseFeed() {
             className="w-full rounded-full border border-slate-200 bg-white/90 py-3 pl-11 pr-4 text-sm text-slate-700 shadow-sm shadow-slate-200/60 outline-none transition focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
           />
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowFavoritesOnly((current) => !current)}
-          className={`inline-flex items-center justify-center gap-2 self-start rounded-full px-5 py-3 text-sm font-medium shadow-sm transition sm:self-auto ${
-            showFavoritesOnly
-              ? "bg-amber-400 text-white shadow-amber-200"
-              : "bg-white/90 text-slate-600 shadow-slate-200/60 hover:bg-slate-50"
-          }`}
-        >
-          <span aria-hidden="true">{showFavoritesOnly ? "★" : "☆"}</span>
-          {showFavoritesOnly ? "Showing Favorites" : "Show Favorites Only"}
-        </button>
       </div>
 
-      {/* Empty states */}
       {glimpses.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-8 py-20 text-center shadow-sm">
           <span className="text-4xl">🖼️</span>
-          <p className="mt-4 text-lg font-medium text-slate-600">
-            Your memories will appear here ✨
-          </p>
+          <p className="mt-4 text-lg font-medium text-slate-600">Your memories will appear here ✨</p>
         </div>
       ) : filteredGlimpses.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-8 py-20 text-center shadow-sm">
@@ -630,6 +493,8 @@ export default function GlimpseFeed() {
           <p className="mt-4 text-lg font-medium text-slate-600">
             {feedTab === "following"
               ? "No memories from people you follow yet."
+              : feedTab === "favorites"
+              ? "You haven't favorited anything yet."
               : "No memories found."}
           </p>
         </div>
@@ -642,6 +507,8 @@ export default function GlimpseFeed() {
             const isOwner = currentUserId === glimpse.user_id;
             const isEditing = editingId === glimpse.id;
             const isFavorited = !!favorites[glimpse.id];
+            const shareUrl =
+              typeof window !== "undefined" ? `${window.location.origin}/profile/${glimpse.user_id}` : "";
 
             return (
               <motion.article
@@ -651,7 +518,6 @@ export default function GlimpseFeed() {
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
                 className="flex flex-col overflow-hidden rounded-[28px] border border-white/90 bg-white/90 shadow-lg shadow-slate-200/40 backdrop-blur-xl transition duration-300"
               >
-                {/* Image */}
                 <div className="relative">
                   <button
                     type="button"
@@ -686,7 +552,6 @@ export default function GlimpseFeed() {
                     </AnimatePresence>
                   </button>
 
-                  {/* Favorite button, floating over the image */}
                   <button
                     type="button"
                     onClick={() => toggleFavorite(glimpse.id)}
@@ -701,7 +566,6 @@ export default function GlimpseFeed() {
                   </button>
                 </div>
 
-                {/* Content */}
                 <div className="flex flex-1 flex-col gap-4 p-6">
                   <div className="flex items-start justify-between gap-3">
                     {isEditing ? (
@@ -756,7 +620,6 @@ export default function GlimpseFeed() {
                     )}
                   </div>
 
-                  {/* Clean metadata row + share/download actions */}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-5 text-sm text-slate-500">
                       <LikeButton
@@ -775,27 +638,7 @@ export default function GlimpseFeed() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-  type="button"
-  onClick={() => shareMemory(glimpse)}
-  aria-label="Share memory"
-  className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
->
-  🔗
-</button>
-
-<a
-  href={glimpse.image_url}
-  download
-  target="_blank"
-  rel="noreferrer"
-  aria-label="Download image"
-  className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
->
-  ⬇️
-</a>
-                    </div>
+                    <ShareMenu shareUrl={shareUrl} imageUrl={glimpse.image_url} title={glimpse.caption ?? undefined} />
                   </div>
 
                   <CommentSection
@@ -803,9 +646,7 @@ export default function GlimpseFeed() {
                     draft={commentDrafts[glimpse.id] ?? ""}
                     disabled={false}
                     currentUserId={currentUserId ?? undefined}
-                    onDraftChange={(value) =>
-                      setCommentDrafts((drafts) => ({ ...drafts, [glimpse.id]: value }))
-                    }
+                    onDraftChange={(value) => setCommentDrafts((drafts) => ({ ...drafts, [glimpse.id]: value }))}
                     onSubmit={() => postComment(glimpse.id)}
                     onDelete={(commentId) => deleteComment(glimpse.id, commentId)}
                   />
@@ -816,7 +657,6 @@ export default function GlimpseFeed() {
         </div>
       )}
 
-      {/* Fullscreen viewer */}
       <AnimatePresence>
         {selectedGlimpse ? (
           <motion.div
@@ -890,38 +730,26 @@ export default function GlimpseFeed() {
                 )}
               </AnimatePresence>
 
-              {/* Caption + date overlay */}
               <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-transparent p-6 pt-16">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-base font-medium text-white">
                       {selectedGlimpse.caption || "Untitled Memory ✨"}
                     </p>
-                    <p className="mt-1 text-xs text-white/60">
-                      {formatFullDateTime(selectedGlimpse.created_at)}
-                    </p>
+                    <p className="mt-1 text-xs text-white/60">{formatFullDateTime(selectedGlimpse.created_at)}</p>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <button
-  type="button"
-  onClick={() => shareMemory(selectedGlimpse)}
-  aria-label="Share memory"
-  className="rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20"
->
-  🔗
-</button>
-
-<a
-  href={selectedGlimpse.image_url}
-  download
-  target="_blank"
-  rel="noreferrer"
-  aria-label="Download image"
-  className="rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20"
->
-  ⬇️
-</a>
+                    <ShareMenu
+                      shareUrl={
+                        typeof window !== "undefined"
+                          ? `${window.location.origin}/profile/${selectedGlimpse.user_id}`
+                          : ""
+                      }
+                      imageUrl={selectedGlimpse.image_url}
+                      title={selectedGlimpse.caption ?? undefined}
+                      variant="dark"
+                    />
 
                     {currentUserId === selectedGlimpse.user_id && (
                       <button

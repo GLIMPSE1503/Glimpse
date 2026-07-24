@@ -16,9 +16,7 @@ type Props = {
 };
 
 function formatJoinedDate(dateString: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(
-    new Date(dateString)
-  );
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(dateString));
 }
 
 export default function ProfileHeader({
@@ -34,16 +32,21 @@ export default function ProfileHeader({
   const fullName = profile?.full_name || "Glimpse User";
   const bio = profile?.bio;
   const avatarUrl = profile?.avatar_url;
+  const coverUrl = profile?.cover_url;
   const joined = profile?.created_at ? formatJoinedDate(profile.created_at) : null;
 
   return (
     <div className="overflow-hidden rounded-[32px] border border-white/90 bg-white/90 shadow-lg shadow-slate-200/40 backdrop-blur-xl">
-      {/* Cover banner */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="h-32 w-full bg-gradient-to-r from-fuchsia-400 via-purple-400 to-indigo-400 sm:h-40"
+        className="h-32 w-full bg-gradient-to-r from-fuchsia-400 via-purple-400 to-indigo-400 sm:h-44"
+        style={
+          coverUrl
+            ? { backgroundImage: `url(${coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+            : undefined
+        }
       />
 
       <div className="flex flex-col items-center gap-4 px-6 pb-8 sm:flex-row sm:items-end sm:gap-6 sm:px-8">

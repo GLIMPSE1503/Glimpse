@@ -27,6 +27,7 @@ export type ProfileRow = {
   full_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  cover_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,15 +40,44 @@ export type FollowRow = {
 export type NotificationRow = {
   id: string;
   user_id: string;
-  actor_id: string;
-  type: "like" | "comment" | "follow";
+  sender_id: string;
   glimpse_id: string | null;
-  comment_id: string | null;
+  type: "like" | "comment" | "follow";
+  message: string;
   is_read: boolean;
   created_at: string;
-  // joined fields, populated client-side
-  actor_name?: string | null;
-  actor_avatar?: string | null;
+
+  sender_name?: string | null;
+  sender_avatar?: string | null;
+};
+export type FollowerRow = {
+  id: string;
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+};
+
+
+export type ProfileStatsRow = {
+  id: string;
+  full_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  created_at: string;
+  followers_count: number;
+  following_count: number;
+  posts_count: number;
+};
+
+export type GlimpseStatsRow = {
+  id: string;
+  user_id: string;
+  image_url: string;
+  caption: string | null;
+  created_at: string;
+  like_count: number;
+  comment_count: number;
 };
 
 export type SupabaseUser = {

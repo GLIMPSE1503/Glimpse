@@ -55,7 +55,7 @@ export default function ProfilePage() {
     ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, bio, avatar_url, created_at, updated_at")
+        .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
         .eq("id", profileUserId)
         .maybeSingle(),
       supabase
@@ -63,11 +63,11 @@ export default function ProfilePage() {
         .select("id, user_id, image_url, caption, created_at")
         .eq("user_id", profileUserId)
         .order("created_at", { ascending: false }),
-      supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", profileUserId),
-      supabase.from("follows").select("following_id", { count: "exact", head: true }).eq("follower_id", profileUserId),
+      supabase.from("followers").select("follower_id", { count: "exact", head: true }).eq("following_id", profileUserId),
+      supabase.from("followers").select("following_id", { count: "exact", head: true }).eq("follower_id", profileUserId),
       viewerId
         ? supabase
-            .from("follows")
+            .from("followers")
             .select("follower_id")
             .eq("follower_id", viewerId)
             .eq("following_id", profileUserId)
@@ -163,6 +163,7 @@ export default function ProfilePage() {
           initialFullName={profile?.full_name ?? ""}
           initialBio={profile?.bio ?? ""}
           initialAvatarUrl={profile?.avatar_url ?? ""}
+          initialCoverUrl={profile?.cover_url ?? ""}
           onClose={() => setIsEditOpen(false)}
           onSaved={(updated) => {
             setProfile(updated);

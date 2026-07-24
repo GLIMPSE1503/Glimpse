@@ -29,7 +29,7 @@ export default function DiscoverUsers({ currentUserId }: { currentUserId: string
 
       let query = supabase
         .from("profiles")
-        .select("id, full_name, bio, avatar_url, created_at, updated_at")
+      .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
         .order("created_at", { ascending: false })
         .limit(12);
 
