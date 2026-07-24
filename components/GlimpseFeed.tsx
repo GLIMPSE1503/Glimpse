@@ -26,6 +26,18 @@ function formatRelativeTime(createdAt: string) {
 
   return new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "short" }).format(date);
 }
+function getTimeRemaining(expiresAt: string | null) {
+  if (!expiresAt) return "24h left";
+
+  const diff = new Date(expiresAt).getTime() - Date.now();
+
+  if (diff <= 0) return "Expired";
+
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+
+  return `${hours}h ${minutes}m left`;
+}
 
 function formatFullDateTime(createdAt: string) {
   const date = new Date(createdAt);
@@ -428,19 +440,27 @@ export default function GlimpseFeed() {
     const nextPage = page + 1;
     const from = nextPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
+const { data, error } = await supabase
+  .from("glimpses")
+  .select(`
+    id,
+    user_id,
+    image_url,
+    caption,
+    created_at,
+    expires_at,
+    is_archived
+  `)
+  .gt("expires_at", new Date().toISOString())
+  .order("created_at", { ascending: false })
+  .range(from, to);
 
-    const { data, error } = await supabase
-      .from("glimpses")
-      .select("id, user_id, image_url, caption, created_at")
-      .order("created_at", { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error(error);
-      toast.showToast("Could not load more memories.", "error");
-      setLoadingMore(false);
-      return;
-    }
+if (error) {
+  console.error(error);
+  toast.showToast("Could not load more memories.", "error");
+  setLoadingMore(false);
+  return;
+}
 
     const newGlimpses = data ?? [];
     setGlimpses((current) => [...current, ...newGlimpses]);
@@ -641,10 +661,21 @@ export default function GlimpseFeed() {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-base font-semibold leading-6 text-slate-900">
-                          {glimpse.caption || "Untitled Memory ✨"}
-                        </p>
-                      )}
+  <div className="flex-1">
+    <p className="text-base font-semibold leading-6 text-slate-900">
+      {glimpse.caption || "Untitled Memory ✨"}
+    </p>
+
+    {glimpse.is_archived && (
+      <div className="mt-2">
+        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+          📦 Archived Memory
+        </span>
+      </div>
+    )}
+  </div>
+)
+                      }
 
                       {isOwner && !isEditing && (
                         <div className="flex shrink-0 gap-2">
@@ -679,7 +710,7 @@ export default function GlimpseFeed() {
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span aria-hidden="true">🕒</span>
-                        <span>{formatRelativeTime(glimpse.created_at)}</span>
+                       <span>{getTimeRemaining(glimpse.expires_at)}</span>
                       </span>
                     </div>
 

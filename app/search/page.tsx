@@ -66,7 +66,15 @@ export default function SearchPage() {
           .limit(10),
         supabase
           .from("glimpses")
-          .select("id, user_id, image_url, caption, created_at")
+           .select(`
+    id,
+    user_id,
+    image_url,
+    caption,
+    created_at,
+    expires_at,
+    is_archived
+  `)
           .ilike("caption", `%${term}%`)
           .order("created_at", { ascending: false })
           .limit(12),

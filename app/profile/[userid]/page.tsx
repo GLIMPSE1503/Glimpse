@@ -9,6 +9,11 @@ import ProfileStats from "@/components/profile/ProfileStats";
 import ProfileMemoryGrid from "@/components/profile/ProfileMemoryGrid";
 import EditProfileModal from "@/components/profile/EditProfileModal";
 import { ProfileRow, GlimpseRow } from "@/lib/supabase/types";
+import ProfileCompletion from "@/components/profile/ProfileCompletion";
+import PinnedMemories from "@/components/profile/PinnedMemories";
+import MemoryStatsCards from "@/components/profile/MemoryStatsCards";
+import MemoryCalendarHeatmap from "@/components/profile/MemoryCalendarHeatmap";
+import { MemoryStatsRow } from "@/lib/supabase/types";
 
 type Stats = {
   postsCount: number;
@@ -37,6 +42,7 @@ export default function ProfilePage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const isOwnProfile = currentUserId !== null && currentUserId === profileUserId;
+  const [memoryStats, setMemoryStats] = useState<MemoryStatsRow | null>(null);
 
   async function loadProfile() {
     setLoading(true);
@@ -59,10 +65,18 @@ export default function ProfilePage() {
         .eq("id", profileUserId)
         .maybeSingle(),
       supabase
-        .from("glimpses")
-        .select("id, user_id, image_url, caption, created_at")
-        .eq("user_id", profileUserId)
-        .order("created_at", { ascending: false }),
+  .from("glimpses")
+  .select(`
+    id,
+    user_id,
+    image_url,
+    caption,
+    created_at,
+    expires_at,
+    is_archived
+  `)
+  .eq("user_id", profileUserId)
+  .order("created_at", { ascending: false }),
       supabase.from("followers").select("follower_id", { count: "exact", head: true }).eq("following_id", profileUserId),
       supabase.from("followers").select("following_id", { count: "exact", head: true }).eq("follower_id", profileUserId),
       viewerId

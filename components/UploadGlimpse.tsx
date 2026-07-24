@@ -39,11 +39,13 @@ export default function UploadGlimpse({ onClose }: UploadGlimpseProps) {
 
       const { error } = await supabase
         .from("glimpses")
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          caption,
-        });
+       .insert({
+  user_id: user.id,
+  image_url: imageUrl,
+  caption,
+  expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  is_archived: false,
+});
 
       if (error) {
         console.error("INSERT ERROR:", error);

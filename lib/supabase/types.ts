@@ -4,6 +4,39 @@ export type GlimpseRow = {
   image_url: string;
   caption: string | null;
   created_at: string;
+
+  expires_at: string;
+  is_archived: boolean;
+};
+export type CollectionStatsRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  emoji: string;
+  is_private: boolean;
+  created_at: string;
+  updated_at: string;
+  cover_image_url: string | null;
+  item_count: number;
+};
+
+export type MemoryStatsRow = {
+  user_id: string;
+  total_memories: number;
+  archived_memories: number;
+  collections_count: number;
+  likes_received: number;
+  comments_received: number;
+};
+
+export type BlockedUserRow = {
+  id: string;
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+  blocked_name?: string | null;
+  blocked_avatar?: string | null;
 };
 
 export type LikeRow = {
