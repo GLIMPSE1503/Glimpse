@@ -72,15 +72,17 @@ export default function CollectionDetailPage() {
 
     const { data: glimpsesData, error: glimpsesError } = await supabase
       .from("glimpses")
-        .select(`
-    id,
-    user_id,
-    image_url,
-    caption,
-    created_at,
-    expires_at,
-    is_archived
-  `)
+      .select(`
+  id,
+  user_id,
+  image_url,
+  caption,
+  created_at,
+  expires_at,
+  is_archived,
+  archived_at,
+  is_pinned
+`)
       .in("id", glimpseIds);
 
     if (glimpsesError) {

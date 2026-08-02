@@ -1,0 +1,3 @@
+components/vault/page.tsx(64,25): error TS2345: Argument of type '{ id: any; user_id: any; image_url: any; caption: any; created_at: any; expires_at: any; is_archived: any; }[]' is not assignable to parameter of type 'SetStateAction<GlimpseRow[]>'.
+  Type '{ id: any; user_id: any; image_url: any; caption: any; created_at: any; expires_at: any; is_archived: any; }[]' is not assignable to type 'GlimpseRow[]'.
+    Type '{ id: any; user_id: any; image_url: any; caption: any; created_at: any; expires_at: any; is_archived: any; }' is missing the following properties from type 'GlimpseRow': archived_at, is_pinned

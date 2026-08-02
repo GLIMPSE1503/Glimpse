@@ -72,7 +72,9 @@ export default function EditProfileModal({
         cover_url: finalCoverUrl || null,
         updated_at: new Date().toISOString(),
       })
-      .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
+      .select(
+        "id, full_name, bio, avatar_url, cover_url, is_private, notify_likes, notify_comments, notify_follows, auto_archive_enabled, language, created_at, updated_at"
+      )
       .single();
 
     setSaving(false);

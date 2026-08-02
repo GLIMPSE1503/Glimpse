@@ -5,9 +5,11 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import FollowListItem from "@/components/follow/FollowListItem";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { ProfileRow } from "@/lib/supabase/types";
+import { resolveFollowStatuses } from "@/lib/follow";
+import { ProfileRow, FollowStatus } from "@/lib/supabase/types";
 
 interface NavbarProps {
   user: User | null;
@@ -21,7 +23,10 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<ProfileRow[]>([]);
+  const [searchStatusMap, setSearchStatusMap] = useState<Record<string, FollowStatus>>({});
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const currentUserId = user?.id ?? null;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 24);
@@ -44,6 +49,7 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
     const term = searchTerm.trim();
     if (!term) {
       setSearchResults([]);
+      setSearchStatusMap({});
       return;
     }
 
@@ -51,7 +57,7 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
+        .select("*")
         .ilike("full_name", `%${term}%`)
         .limit(8);
 
@@ -59,11 +65,20 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
         console.error(error);
         return;
       }
-      setSearchResults(data ?? []);
+
+      const results = (data as ProfileRow[]) ?? [];
+      setSearchResults(results);
+
+      const statuses = await resolveFollowStatuses(
+        supabase,
+        currentUserId,
+        results.map((p) => p.id)
+      );
+      setSearchStatusMap(statuses);
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [searchTerm]);
+  }, [searchTerm, currentUserId]);
 
   async function signIn() {
     const supabase = createClient();
@@ -71,6 +86,16 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setMobileMenuOpen(false);
+    setSearchTerm("");
+  }
+
+  function handleSearchFollowChange(userId: string, status: FollowStatus) {
+    setSearchStatusMap((current) => ({ ...current, [userId]: status }));
   }
 
   return (
@@ -89,12 +114,7 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
             <span className="hidden text-sm text-slate-500 sm:inline">Moments, refined</span>
           </div>
 
-          <Link
-            href="/discover"
-            className="hidden rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 hover:bg-violet-50 md:inline-flex"
-          >
-            🧭 Discover
-          </Link>
+         
         </div>
 
         <div className="hidden flex-1 items-center justify-center gap-3 md:flex">
@@ -118,31 +138,22 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-2 shadow-xl"
+                  className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 space-y-2 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-2 shadow-xl"
                 >
                   {searchResults.length === 0 ? (
                     <p className="p-3 text-center text-sm text-slate-400">No people found.</p>
                   ) : (
-                    searchResults.map((person) => (
-                      <Link
+                    searchResults.map((person, index) => (
+                      <FollowListItem
                         key={person.id}
-                        href={`/profile/${person.id}`}
-                        onClick={() => {
-                          setSearchOpen(false);
-                          setSearchTerm("");
-                        }}
-                        className="flex items-center gap-3 rounded-2xl p-2.5 transition hover:bg-violet-50"
-                      >
-                        <img
-                          src={person.avatar_url || "/placeholder-avatar.png"}
-                          alt={person.full_name ?? "User"}
-                          className="h-9 w-9 rounded-full object-cover"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{person.full_name || "Glimpse User"}</p>
-                          {person.bio && <p className="line-clamp-1 text-xs text-slate-500">{person.bio}</p>}
-                        </div>
-                      </Link>
+                        profile={person}
+                        currentUserId={currentUserId}
+                        index={index}
+                        followStatus={searchStatusMap[person.id] ?? "none"}
+                        showRemoveButton={false}
+                        onFollowChange={handleSearchFollowChange}
+                        onProfileClick={closeSearch}
+                      />
                     ))
                   )}
                 </motion.div>
@@ -159,7 +170,7 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
             Upload memory
           </button>
 
-          <NotificationBell currentUserId={user?.id ?? null} />
+          <NotificationBell currentUserId={currentUserId} />
 
           {user ? (
             <div className="relative hidden md:block">
@@ -193,28 +204,47 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
                   </div>
 
                   <div className="mt-4 space-y-2">
-                    <Link
-                      href={`/profile/${user.id}`}
-                      onClick={() => setDropdownOpen(false)}
-                      className="block rounded-xl px-4 py-3 hover:bg-violet-50"
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      href="/discover"
-                      onClick={() => setDropdownOpen(false)}
-                      className="block rounded-xl px-4 py-3 hover:bg-violet-50"
-                    >
-                      Discover
-                    </Link>
-                    <button
-                      onClick={onUploadOpen}
-                      className="block w-full rounded-xl px-4 py-3 text-left hover:bg-violet-50"
-                    >
-                      Upload Memory
-                    </button>
-                    <LogoutButton />
-                  </div>
+  <Link
+    href={`/profile/${user.id}`}
+    onClick={() => setDropdownOpen(false)}
+    className="block rounded-xl px-4 py-3 hover:bg-violet-50"
+  >
+    Profile
+  </Link>
+
+  <Link
+    href="/archive"
+    onClick={() => setDropdownOpen(false)}
+    className="block rounded-xl px-4 py-3 hover:bg-violet-50"
+  >
+    Archive
+  </Link>
+
+  <Link
+    href="/collage"
+    onClick={() => setDropdownOpen(false)}
+    className="block rounded-xl px-4 py-3 hover:bg-violet-50"
+  >
+    Monthly Collage
+  </Link>
+
+  <Link
+    href="/settings"
+    onClick={() => setDropdownOpen(false)}
+    className="block rounded-xl px-4 py-3 hover:bg-violet-50"
+  >
+    Settings
+  </Link>
+
+  <button
+    onClick={onUploadOpen}
+    className="block w-full rounded-xl px-4 py-3 text-left hover:bg-violet-50"
+  >
+    Upload Memory
+  </button>
+
+  <LogoutButton />
+</div>
                 </div>
               )}
             </div>
@@ -227,7 +257,6 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
             </button>
           )}
 
-          {/* Mobile hamburger */}
           <button
             onClick={() => setMobileMenuOpen((current) => !current)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-3xl border border-slate-200 bg-white md:hidden"
@@ -238,7 +267,6 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
         </div>
       </div>
 
-      {/* Mobile menu panel */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
@@ -248,73 +276,86 @@ export default function Navbar({ user, onUploadOpen }: NavbarProps) {
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl md:hidden"
           >
-            <div className="flex flex-col gap-1 px-4 py-4">
+            <div className="flex flex-col gap-2 px-4 py-4">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search people..."
-                className="mb-2 w-full rounded-3xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
+                className="mb-1 w-full rounded-3xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100"
               />
               {searchTerm.trim() &&
                 (searchResults.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-slate-400">No people found.</p>
                 ) : (
-                  searchResults.map((person) => (
-                    <Link
-                      key={person.id}
-                      href={`/profile/${person.id}`}
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        setSearchTerm("");
-                      }}
-                      className="flex items-center gap-3 rounded-2xl p-2.5 hover:bg-violet-50"
-                    >
-                      <img
-                        src={person.avatar_url || "/placeholder-avatar.png"}
-                        alt={person.full_name ?? "User"}
-                        className="h-9 w-9 rounded-full object-cover"
+                  <div className="space-y-2">
+                    {searchResults.map((person, index) => (
+                      <FollowListItem
+                        key={person.id}
+                        profile={person}
+                        currentUserId={currentUserId}
+                        index={index}
+                        followStatus={searchStatusMap[person.id] ?? "none"}
+                        showRemoveButton={false}
+                        onFollowChange={handleSearchFollowChange}
+                        onProfileClick={closeSearch}
                       />
-                      <p className="text-sm font-medium text-slate-900">{person.full_name || "Glimpse User"}</p>
-                    </Link>
-                  ))
+                    ))}
+                  </div>
                 ))}
 
-              <Link
-                href="/discover"
-                onClick={() => setMobileMenuOpen(false)}
-                className="rounded-xl px-4 py-3 hover:bg-violet-50"
-              >
-                🧭 Discover
-              </Link>
+              
 
               {user ? (
                 <>
-                  <Link
-                    href={`/profile/${user.id}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="rounded-xl px-4 py-3 hover:bg-violet-50"
-                  >
-                    Profile
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onUploadOpen();
-                    }}
-                    className="rounded-xl px-4 py-3 text-left hover:bg-violet-50"
-                  >
-                    Upload Memory
-                  </button>
-                  <div className="px-4 py-2">
-                    <LogoutButton />
-                  </div>
+                 <Link
+  href={`/profile/${user.id}`}
+  onClick={() => setMobileMenuOpen(false)}
+  className="rounded-xl px-4 py-3 hover:bg-violet-50"
+>
+  Profile
+</Link>
+
+<Link
+  href="/archive"
+  onClick={() => setMobileMenuOpen(false)}
+  className="rounded-xl px-4 py-3 hover:bg-violet-50"
+>
+  Archive
+</Link>
+
+<Link
+  href="/collage"
+  onClick={() => setMobileMenuOpen(false)}
+  className="rounded-xl px-4 py-3 hover:bg-violet-50"
+>
+  Monthly Collage
+</Link>
+
+<Link
+  href="/settings"
+  onClick={() => setMobileMenuOpen(false)}
+  className="rounded-xl px-4 py-3 hover:bg-violet-50"
+>
+  Settings
+</Link>
+
+<button
+  onClick={() => {
+    setMobileMenuOpen(false);
+    onUploadOpen();
+  }}
+  className="rounded-xl px-4 py-3 text-left hover:bg-violet-50"
+>
+  Upload Memory
+</button>
+
+<div className="px-4 py-2">
+  <LogoutButton />
+</div>
                 </>
               ) : (
-                <button
-                  onClick={signIn}
-                  className="mt-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-                >
+                <button onClick={signIn} className="mt-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                   Sign in with Google
                 </button>
               )}

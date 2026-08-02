@@ -61,23 +61,41 @@ export default function SearchPage() {
       const [usersRes, postsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
+.select(
+  `
+  id,
+  full_name,
+  bio,
+  avatar_url,
+  cover_url,
+  is_private,
+  notify_likes,
+  notify_comments,
+  notify_follows,
+  auto_archive_enabled,
+  language,
+  created_at,
+  updated_at
+  `
+)
           .ilike("full_name", `%${term}%`)
           .limit(10),
-        supabase
-          .from("glimpses")
-           .select(`
+   supabase
+  .from("glimpses")
+  .select(`
     id,
     user_id,
     image_url,
     caption,
     created_at,
     expires_at,
-    is_archived
+    is_archived,
+    archived_at,
+    is_pinned
   `)
-          .ilike("caption", `%${term}%`)
-          .order("created_at", { ascending: false })
-          .limit(12),
+  .ilike("caption", `%${term}%`)
+  .order("created_at", { ascending: false })
+  .limit(12)
       ]);
 
       if (usersRes.error) console.error(usersRes.error);

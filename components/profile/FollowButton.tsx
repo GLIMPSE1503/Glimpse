@@ -1,103 +1,92 @@
 "use client";
 
-import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ToastProvider";
+import { useFollow } from "@/hooks/useFollow";
+import type { FollowStatus } from "@/lib/supabase/types";
 
 type Props = {
   currentUserId: string | null;
   targetUserId: string;
-  initialIsFollowing: boolean;
-  onChange?: (isFollowing: boolean) => void;
+  targetIsPrivate: boolean;
+  initialStatus: FollowStatus;
+  onChange?: (status: FollowStatus) => void;
   size?: "sm" | "md";
 };
 
 export default function FollowButton({
   currentUserId,
   targetUserId,
-  initialIsFollowing,
+  targetIsPrivate,
+  initialStatus,
   onChange,
   size = "md",
 }: Props) {
   const toast = useToast();
-  const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
-  const [loading, setLoading] = useState(false);
+  const { status, loading, toggleFollow } = useFollow({
+    currentUserId,
+    targetUserId,
+    targetIsPrivate,
+    initialStatus,
+    onStatusChange: onChange,
+  });
 
   const isSelf = currentUserId === targetUserId;
 
-  async function toggleFollow() {
-    if (!currentUserId) {
-      toast.showToast("Sign in to follow people.", "info");
+  async function handleClick() {
+    const previousStatus = status;
+    const result = await toggleFollow();
+
+    if (result.success) {
+      if (previousStatus === "following") {
+        toast.showToast("Unfollowed.", "success");
+      } else if (previousStatus === "none") {
+        toast.showToast("You are now following this user.", "success");
+      }
       return;
     }
-    if (isSelf) return;
-    if (loading) return;
 
-    const wasFollowing = isFollowing;
-    const next = !wasFollowing;
-
-    setIsFollowing(next);
-    onChange?.(next);
-    setLoading(true);
-
-    const supabase = createClient();
-
-    if (next) {
-      const { error } = await supabase
-        .from("followers")
-        .insert({ follower_id: currentUserId, following_id: targetUserId });
-
-      if (error) {
-        console.error(error);
-        setIsFollowing(wasFollowing);
-        onChange?.(wasFollowing);
-        toast.showToast("Could not follow this user.", "error");
-      }
-    } else {
-      const { error } = await supabase
-        .from("followers")
-        .delete()
-        .eq("follower_id", currentUserId)
-        .eq("following_id", targetUserId);
-
-      if (error) {
-        console.error(error);
-        setIsFollowing(wasFollowing);
-        onChange?.(wasFollowing);
-        toast.showToast("Could not unfollow this user.", "error");
-      }
+    if (result.errorMessage) {
+      toast.showToast(result.errorMessage, "info");
     }
-
-    setLoading(false);
   }
 
   if (isSelf) return null;
 
   const padding = size === "sm" ? "px-4 py-1.5 text-xs" : "px-5 py-2 text-sm";
 
+  const labelFor = (s: FollowStatus) => (s === "following" ? "Following" : s === "requested" ? "Requested" : "Follow");
+
+  const stylesFor = (s: FollowStatus) => {
+    if (s === "following") {
+      return "border border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600";
+    }
+    if (s === "requested") {
+      return "border border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200";
+    }
+    return "bg-purple-500 text-white shadow-purple-200 hover:bg-purple-600";
+  };
+
   return (
     <motion.button
       type="button"
-      onClick={toggleFollow}
+      onClick={handleClick}
       disabled={loading}
       whileTap={{ scale: 0.94 }}
-      className={`relative overflow-hidden rounded-full font-medium shadow-sm transition ${padding} ${
-        isFollowing
-          ? "border border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-          : "bg-purple-500 text-white shadow-purple-200 hover:bg-purple-600"
-      } disabled:opacity-60`}
+      className={`relative overflow-hidden rounded-full font-medium shadow-sm transition ${padding} ${stylesFor(
+        status
+      )} disabled:opacity-60`}
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
-          key={isFollowing ? "following" : "follow"}
+          key={status}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.15 }}
           className="inline-block"
         >
-          {isFollowing ? "Following" : "Follow"}
+          {labelFor(status)}
         </motion.span>
       </AnimatePresence>
     </motion.button>

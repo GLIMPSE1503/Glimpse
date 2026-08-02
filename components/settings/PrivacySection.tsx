@@ -19,12 +19,12 @@ export default function PrivacySection({ userId, profile, onProfileChange }: Pro
     if (saving) return;
     setSaving(true);
 
-    const nextValue = !profile.is_private_account;
+    const nextValue = !profile.is_private;
     const supabase = createClient();
 
     const { error } = await supabase
       .from("profiles")
-      .update({ is_private_account: nextValue })
+      .update({ is_private: nextValue })
       .eq("id", userId);
 
     setSaving(false);
@@ -35,7 +35,7 @@ export default function PrivacySection({ userId, profile, onProfileChange }: Pro
       return;
     }
 
-    onProfileChange({ ...profile, is_private_account: nextValue });
+    onProfileChange({ ...profile, is_private: nextValue });
     toast.showToast(nextValue ? "Your account is now private." : "Your account is now public.", "success");
   }
 
@@ -48,7 +48,8 @@ export default function PrivacySection({ userId, profile, onProfileChange }: Pro
         <div>
           <p className="text-sm font-medium text-slate-800">Private Account</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            Only approved followers can see your memories and stories.
+            Only approved followers can see your memories and stories. New followers will need to send a
+            follow request.
           </p>
         </div>
         <button
@@ -56,22 +57,16 @@ export default function PrivacySection({ userId, profile, onProfileChange }: Pro
           onClick={togglePrivateAccount}
           disabled={saving}
           className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-            profile.is_private_account ? "bg-purple-500" : "bg-slate-200"
+            profile.is_private ? "bg-purple-500" : "bg-slate-200"
           } disabled:opacity-60`}
         >
           <span
             className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-              profile.is_private_account ? "translate-x-6" : "translate-x-1"
+              profile.is_private ? "translate-x-6" : "translate-x-1"
             }`}
           />
         </button>
       </div>
-
-      <p className="mt-4 text-xs text-slate-400">
-        Note: enforcing this setting on profile/feed queries requires matching RLS policy changes on
-        `glimpses`/`profiles` — this toggle currently stores the preference; wire the read policies to it
-        when you're ready to fully enforce private accounts.
-      </p>
     </div>
   );
 }

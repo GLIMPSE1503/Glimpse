@@ -28,8 +28,22 @@ export default function DiscoverUsers({ currentUserId }: { currentUserId: string
       const excludeIds = currentUserId ? [currentUserId, ...followingIds] : followingIds;
 
       let query = supabase
-        .from("profiles")
-      .select("id, full_name, bio, avatar_url, cover_url, created_at, updated_at")
+       .from("profiles")
+.select(`
+  id,
+  full_name,
+  bio,
+  avatar_url,
+  cover_url,
+  is_private,
+  notify_likes,
+  notify_comments,
+  notify_follows,
+  auto_archive_enabled,
+  language,
+  created_at,
+  updated_at
+`)
         .order("created_at", { ascending: false })
         .limit(12);
 
@@ -39,7 +53,7 @@ export default function DiscoverUsers({ currentUserId }: { currentUserId: string
 
       const { data, error } = await query;
       if (error) console.error(error);
-      setUsers(data ?? []);
+      setUsers((data as ProfileRow[]) ?? []);
       setLoading(false);
     }
 
@@ -82,12 +96,13 @@ export default function DiscoverUsers({ currentUserId }: { currentUserId: string
                 {user.bio && <p className="line-clamp-2 text-xs text-slate-500">{user.bio}</p>}
               </Link>
 
-              <FollowButton
-                currentUserId={currentUserId}
-                targetUserId={user.id}
-                initialIsFollowing={false}
-                size="sm"
-              />
+             <FollowButton
+    currentUserId={currentUserId}
+    targetUserId={user.id}
+    targetIsPrivate={user.is_private}
+    initialStatus="none"
+    size="sm"
+/>
             </motion.div>
           ))}
         </div>

@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { ProfileRow } from "@/lib/supabase/types";
 import FollowButton from "@/components/profile/FollowButton";
+
+type FollowStatus = "none" | "following" | "requested";
 
 type Props = {
   profile: ProfileRow | null;
@@ -10,8 +13,8 @@ type Props = {
   isOwnProfile: boolean;
   currentUserId: string | null;
   profileUserId: string;
-  isFollowing: boolean;
-  onFollowChange: (isFollowing: boolean) => void;
+  followStatus: FollowStatus;
+  onFollowChange: (status: FollowStatus) => void;
   onEdit: () => void;
 };
 
@@ -25,7 +28,7 @@ export default function ProfileHeader({
   isOwnProfile,
   currentUserId,
   profileUserId,
-  isFollowing,
+  followStatus,
   onFollowChange,
   onEdit,
 }: Props) {
@@ -72,20 +75,29 @@ export default function ProfileHeader({
           {joined && <p className="text-xs text-slate-400">Joined {joined}</p>}
         </div>
 
-        <div className="shrink-0 sm:pb-2">
+        <div className="flex shrink-0 items-center gap-2 sm:pb-2">
           {isOwnProfile ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="rounded-full bg-purple-500 px-5 py-2 text-sm font-medium text-white shadow-sm shadow-purple-200 transition hover:bg-purple-600"
-            >
-              Edit Profile
-            </button>
+            <>
+              <Link
+                href="/archive"
+                className="rounded-full bg-slate-100 px-5 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-200"
+              >
+                🗄️ Archive
+              </Link>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-full bg-purple-500 px-5 py-2 text-sm font-medium text-white shadow-sm shadow-purple-200 transition hover:bg-purple-600"
+              >
+                Edit Profile
+              </button>
+            </>
           ) : (
             <FollowButton
               currentUserId={currentUserId}
               targetUserId={profileUserId}
-              initialIsFollowing={isFollowing}
+              targetIsPrivate={profile?.is_private ?? false}
+              initialStatus={followStatus}
               onChange={onFollowChange}
             />
           )}

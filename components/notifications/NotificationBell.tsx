@@ -5,10 +5,13 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationRow } from "@/lib/supabase/types";
+import FollowRequestActions from "@/components/notifications/FollowRequestActions";
 
 function iconFor(type: NotificationRow["type"]) {
   if (type === "like") return "❤️";
   if (type === "comment") return "💬";
+  if (type === "follow_request") return "🔒";
+  if (type === "request_accepted" || type === "follow_accepted") return "✅";
   return "👤";
 }
 
@@ -175,9 +178,21 @@ export default function NotificationBell({ currentUserId }: { currentUserId: str
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 text-sm text-slate-700">{n.message}</p>
                     <p className="text-xs text-slate-400">{timeAgo(n.created_at)}</p>
+                    {n.type === "follow_request" && currentUserId && (
+                      <div className="mt-2">
+                        <FollowRequestActions
+                          requesterId={n.sender_id}
+                          targetId={currentUserId}
+                          onResolved={() => {
+                            setNotifications((current) => current.filter((item) => item.id !== n.id));
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </Link>
               ))
+                
             )}
           </motion.div>
         )}

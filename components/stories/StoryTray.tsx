@@ -23,11 +23,27 @@ export default function StoryTray({ currentUserId, onUploadStory }: Props) {
       setLoading(true);
       const supabase = createClient();
 
-      const { data, error } = await supabase
-        .from("stories")
-        .select("id, user_id, image_url, created_at")
-        .gt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order("created_at", { ascending: true });
+      let followingIds: string[] = [];
+      if (currentUserId) {
+        const { data: followsData, error: followsError } = await supabase
+          .from("followers")
+          .select("following_id")
+          .eq("follower_id", currentUserId);
+
+        if (followsError) console.error(followsError);
+        followingIds = (followsData ?? []).map((f) => f.following_id);
+      }
+
+      const allowedUserIds = currentUserId ? [currentUserId, ...followingIds] : [];
+
+      const { data, error } = allowedUserIds.length > 0
+        ? await supabase
+            .from("stories")
+            .select("id, user_id, image_url, created_at")
+            .in("user_id", allowedUserIds)
+            .gt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .order("created_at", { ascending: true })
+        : { data: [] as StoryRow[], error: null };
 
       if (error) {
         console.error(error);

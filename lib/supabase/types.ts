@@ -1,13 +1,107 @@
+export type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  is_private: boolean;
+  notify_likes: boolean;
+  notify_comments: boolean;
+  notify_follows: boolean;
+  auto_archive_enabled: boolean;
+  language: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProfileStatsRow = {
+  id: string;
+  full_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  created_at: string;
+  followers_count: number;
+  following_count: number;
+  posts_count: number;
+};
+
 export type GlimpseRow = {
   id: string;
   user_id: string;
   image_url: string;
   caption: string | null;
   created_at: string;
-
-  expires_at: string;
+  expires_at: string | null;
   is_archived: boolean;
+  archived_at: string | null;
+  is_pinned: boolean;
+  profiles?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
+
+export type GlimpseStatsRow = GlimpseRow & {
+  like_count: number;
+  comment_count: number;
+};
+
+export type CommentRow = {
+  id: string;
+  glimpse_id: string;
+  user_id: string;
+  user_full_name: string | null;
+  user_avatar_url: string | null;
+  content: string;
+  created_at: string;
+};
+
+export type FollowerRow = {
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+};
+
+export type FollowStatus = "none" | "following" | "requested";
+
+export type FollowRequestRow = {
+  id: string;
+  requester_id: string;
+  target_id: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+  requester_name?: string | null;
+  requester_avatar?: string | null;
+};
+
+export type NotificationRow = {
+  id: string;
+  user_id: string;
+  sender_id: string;
+  glimpse_id: string | null;
+  type: "like" | "comment" | "follow" | "follow_request" | "follow_accepted" | "request_accepted";
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  sender_name?: string | null;
+  sender_avatar?: string | null;
+};
+
+export type CollectionRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type CollectionItemRow = {
+  id: string;
+  collection_id: string;
+  glimpse_id: string;
+  created_at: string;
+};
+
 export type CollectionStatsRow = {
   id: string;
   user_id: string;
@@ -39,79 +133,6 @@ export type BlockedUserRow = {
   blocked_avatar?: string | null;
 };
 
-export type LikeRow = {
-  id: string;
-  glimpse_id: string;
-  user_id: string;
-  created_at: string;
-};
-
-export type CommentRow = {
-  id: string;
-  glimpse_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-  user_full_name?: string | null;
-  user_avatar_url?: string | null;
-};
-export type ProfileRow = {
-  id: string;
-  full_name: string | null;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_url: string | null;
-  created_at: string;
-  updated_at: string;
-};
-export type FollowRow = {
-  follower_id: string;
-  following_id: string;
-  created_at: string;
-};
-
-export type NotificationRow = {
-  id: string;
-  user_id: string;
-  sender_id: string;
-  glimpse_id: string | null;
-  type: "like" | "comment" | "follow";
-  message: string;
-  is_read: boolean;
-  created_at: string;
-
-  sender_name?: string | null;
-  sender_avatar?: string | null;
-};
-export type FollowerRow = {
-  id: string;
-  follower_id: string;
-  following_id: string;
-  created_at: string;
-};
-
-
-export type ProfileStatsRow = {
-  id: string;
-  full_name: string | null;
-  bio: string | null;
-  avatar_url: string | null;
-  cover_url: string | null;
-  created_at: string;
-  followers_count: number;
-  following_count: number;
-  posts_count: number;
-};
-
-export type GlimpseStatsRow = {
-  id: string;
-  user_id: string;
-  image_url: string;
-  caption: string | null;
-  created_at: string;
-  like_count: number;
-  comment_count: number;
-};
 export type StoryRow = {
   id: string;
   user_id: string;
@@ -126,26 +147,4 @@ export type StoryGroup = {
   authorName: string;
   authorAvatar: string | null;
   stories: StoryRow[];
-};
-
-export type CollectionRow = {
-  id: string;
-  user_id: string;
-  name: string;
-  created_at: string;
-};
-
-export type CollectionItemRow = {
-  id: string;
-  collection_id: string;
-  glimpse_id: string;
-  created_at: string;
-};
-export type SupabaseUser = {
-  id: string;
-  email: string | null;
-  user_metadata: {
-    full_name?: string;
-    avatar_url?: string;
-  };
 };

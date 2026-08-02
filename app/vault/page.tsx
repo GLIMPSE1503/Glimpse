@@ -33,6 +33,7 @@ export default function VaultPage() {
   const [activeTab, setActiveTab] = useState<VaultTab>("timeline");
   const [timelineGrouping, setTimelineGrouping] = useState<TimelineGrouping>("month");
   const [vaultSearch, setVaultSearch] = useState("");
+ 
 
   async function loadVault() {
     setLoading(true);
@@ -60,15 +61,36 @@ export default function VaultPage() {
         .order("updated_at", { ascending: false }),
       supabase
         .from("glimpses")
-        .select("id, user_id, image_url, caption, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("glimpses")
-        .select("id, user_id, image_url, caption, created_at")
-        .eq("user_id", userId)
-        .eq("is_archived", true)
-        .order("created_at", { ascending: false }),
+   
+  .select(`
+    id,
+    user_id,
+    image_url,
+    caption,
+    created_at,
+    expires_at,
+    is_archived,
+    archived_at,
+    is_pinned
+  `)
+  .eq("user_id", userId)
+  .order("created_at", { ascending: false }),
+    supabase
+  .from("glimpses")
+  .select(`
+    id,
+    user_id,
+    image_url,
+    caption,
+    created_at,
+    expires_at,
+    is_archived,
+    archived_at,
+    is_pinned
+  `)
+  .eq("user_id", userId)
+  .eq("is_archived", true)
+  .order("created_at", { ascending: false }),
       supabase.from("favorites").select("glimpse_id").eq("user_id", userId),
     ]);
 

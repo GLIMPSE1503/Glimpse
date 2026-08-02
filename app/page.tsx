@@ -1,13 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
-import type { User } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 import HomeShell from "@/components/HomeShell";
 
-export default async function Home() {
+export default async function HomePage() {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return <HomeShell user={user as User | null} />;
+  if (!user) {
+    redirect("/login");
+  }
+
+  return <HomeShell user={user} />;
 }

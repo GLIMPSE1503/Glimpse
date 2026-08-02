@@ -8,6 +8,8 @@ import { NotificationRow } from "@/lib/supabase/types";
 function iconFor(type: NotificationRow["type"]) {
   if (type === "like") return "❤️";
   if (type === "comment") return "💬";
+  if (type === "follow_request") return "🔒";
+  if (type === "follow_accepted" || type === "request_accepted") return "✅";
   return "👤";
 }
 
